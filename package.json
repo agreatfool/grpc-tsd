@@ -1,0 +1,28 @@
+{
+  "name": "grpc-tsd",
+  "version": "0.1.0",
+  "description": "TypeScript d.ts definition of gRPC. Self made for self using, no official support.",
+  "main": "src/grpc.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agreatfool/grpc-tsd.git"
+  },
+  "keywords": [
+    "gRPC",
+    "TypeScript",
+    "d.ts"
+  ],
+  "author": "Jonathan Dai",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/agreatfool/grpc-tsd/issues"
+  },
+  "homepage": "https://github.com/agreatfool/grpc-tsd#readme",
+  "devDependencies": {
+    "@types/node": "^7.0.29",
+    "protobufjs": "^6.7.3"
+  }
+}
