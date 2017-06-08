@@ -10,7 +10,22 @@ Codes mostly come from [#11020](https://github.com/grpc/grpc/pull/11020), and a 
 ## Aim
 Maintain a grpc.d.ts file for gRPC TypeScript project.
 
+## How to use
+### Install
+```bash
+npm install grpc-tsd --save-dev
+```
+
+### Code
+Add following codes in `tsconfig.json`：
+```
+"include": [
+    "node_modules/grpc-tsd/src/grpc.d.ts"
+],
+```
+
 ## Resources
 * [gRPC node source doc](http://www.grpc.io/grpc/node/index.html)
 * [#11020](https://github.com/grpc/grpc/pull/11020)
 * [mixer/etcd3](https://github.com/mixer/etcd3/blob/master/src/types/grpc.d.ts)
+* [How to write d.ts, by Example](http://www.typescriptlang.org/docs/handbook/declaration-files/by-example.html)

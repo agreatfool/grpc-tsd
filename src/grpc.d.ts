@@ -1,7 +1,11 @@
-import { ReflectionObject, Service } from 'protobufjs';
-import { Duplex, Readable, Writable } from 'stream';
-
 declare module 'grpc' {
+
+    import {Stream, Readable, Writable, Duplex} from "stream";
+    import {ReflectionObject, Service} from "protobufjs";
+    import EventEmitter = NodeJS.EventEmitter;
+
+    export type ICallback = () => void;
+    export type ICallbackNode = (error: Error | null, value?: any) => void;
 
     /**
      * Default options for loading proto files into gRPC
@@ -30,7 +34,18 @@ declare module 'grpc' {
 
     export interface ILoadProtobufOptions extends ILoadOptions {
         /**
-         * Indicate that an object from the corresponding version of
+         * Deserialize bytes values as base64 strings instead of Buffers.
+         * Defaults to false
+         */
+        binaryAsBase64: boolean;
+        /**
+         * Deserialize long values as strings instead of objects.
+         * Defaults to true
+         */
+        longsAsStrings: boolean;
+        /**
+         * Available values are 5, 6, and 'detect'. 5 and 6
+         * respectively indicate that an object from the corresponding version of
          * ProtoBuf.js is provided in the value argument. If the option is 'detect',
          * gRPC will guess what the version is based on the structure of the value.
          * Defaults to 'detect'.
@@ -72,6 +87,71 @@ declare module 'grpc' {
      */
     export function loadObject(replectionObject: ReflectionObject, options?: ILoadProtobufOptions): IProtobufDefinition;
 
+    interface ICallStatus {
+        code: number;
+        details: string;
+        metadata?: Metadata;
+    }
+
+    class Call extends Stream {
+        metadataSent: boolean;
+
+        startBatch(batch: { number: ICallStatus | boolean }, callback: ICallbackNode): void;
+
+        /**
+         * Get the endpoint this call/stream is connected to.
+         * @return {string} The URI of the endpoint
+         */
+        getPeer(): string;
+    }
+
+    export interface IServerCall {
+        call: Call;
+
+        /**
+         * Send the initial metadata for a writable stream.
+         * @param {Metadata} responseMetadata Metadata to send
+         */
+        sendMetadata(responseMetadata: Metadata);
+
+        /**
+         * Wait for the client to close, then emit a cancelled event if the client
+         * cancelled.
+         */
+        waitForCancel();
+    }
+    export class ServerUnaryCall extends EventEmitter implements IServerCall {
+        request: any;
+        call: Call;
+        sendMetadata(responseMetadata: Metadata);
+        waitForCancel();
+    }
+    export class ServerWritableStream extends Writable implements IServerCall {
+        request: any;
+        call: Call;
+        sendMetadata(responseMetadata: Metadata);
+        waitForCancel();
+    }
+    export class ServerReadableStream extends Readable implements IServerCall {
+        call: Call;
+        sendMetadata(responseMetadata: Metadata);
+        waitForCancel();
+    }
+    export class ServerDuplexStream extends Duplex implements IServerCall {
+        call: Call;
+        sendMetadata(responseMetadata: Metadata);
+        waitForCancel();
+    }
+
+    export type IRpcImplCallback = (error: Error | null, value: any, trailer?: Metadata, flags?: number) => void;
+
+    export type IRpcImplUnaryCall = (call: ServerUnaryCall, callback: IRpcImplCallback) => void;
+    export type IRpcImplWritableStream = (call: ServerWritableStream) => void;
+    export type IRpcImplReadableStream = (call: ServerReadableStream, callback: IRpcImplCallback) => void;
+    export type IRpcImplDuplexStream = (call: ServerDuplexStream) => void;
+
+    export type IRpcImplementation = IRpcImplUnaryCall | IRpcImplWritableStream | IRpcImplReadableStream | IRpcImplDuplexStream;
+
     /**
      * Serer object that stores request handlers and delegates incoming requests to those handlers
      */
@@ -94,7 +174,7 @@ declare module 'grpc' {
          * is idempotent with itself and forceShutdown.
          * @param callback The shutdown complete callback
          */
-        tryShutdown(callback: () => void): void;
+        tryShutdown(callback: ICallback): void;
 
         /**
          * Forcibly shuts down the server. The server will stop receiving new calls
@@ -105,24 +185,12 @@ declare module 'grpc' {
         forceShutdown(): void;
 
         /**
-         * Registers a handler to handle the named method. Fails if there already is
-         * a handler for the given method. Returns true on success
-         * @param name The name of the method that the provided function should handle/respond to.
-         * @param handler Function that takes a stream of request values and returns a stream of response values
-         * @param serialize Serialization function for responses
-         * @param deserialize Deserialization function for requests
-         * @param type The streaming type of method that this handles
-         * @return True if the handler was set. False if a handler was already set for that name.
-         */
-        register(name: string, handler: () => void, serialize: (obj: any) => Buffer, deserialize: (buffer: Buffer) => any, type: string): boolean;
-
-        /**
          * Add a service to the server, with a corresponding implementation. If you are
          * generating this from a proto file, you should instead use `addProtoService`.
          * @param service The service descriptor, as `getProtobufServiceAttrs` returns
          * @param implementation Map of method names to method implementation for the provided service.
          */
-        addService(service: { [index: string]: any }, implementation: { [index: string]: (...args: any[]) => void }): void;
+        addService(service: IMethodsMap, implementation: { [index: string]: IRpcImplementation }): void;
 
         /**
          * Add a proto service to the server, with a corresponding implementation
@@ -149,6 +217,8 @@ declare module 'grpc' {
         message: string;
     }
 
+    export type ICallbackMetadata = (error: Error | null, metadata?: Metadata) => void;
+
     /**
      * Credentials factories
      */
@@ -171,7 +241,7 @@ declare module 'grpc' {
          * @param metadataGenerator The function that generates metadata
          * @return The credentials object
          */
-        createFromMetadataGenerator(metadataGenerator: (target: { service_url: string }, callback: (error: Error | null, metadata?: Metadata) => void) => void): CallCredentials;
+        createFromMetadataGenerator(metadataGenerator: (target: { service_url: string }, callback: ICallbackMetadata) => void): CallCredentials;
 
         /**
          * Create a gRPC credential from a Google credential object.
@@ -222,7 +292,6 @@ declare module 'grpc' {
         static createInsecure(): ServerCredentials;
     }
 
-
     /**
      * Sets the logger function for the gRPC module. For debugging purposes, the C
      * core will log synchronously directly to stdout unless this function is
@@ -231,14 +300,14 @@ declare module 'grpc' {
      * Logs will be directed to logger.error.
      * @param logger A Console-like object.
      */
-    export function setLogger(logger: { error: (message: string) => void }): void;
+    export function setLogger(logger: Console): void;
 
     /**
      * Sets the logger verbosity for gRPC module logging. The options are members
      * of the grpc.logVerbosity map.
      * @param verbosity The minimum severity to log
      */
-    export function setLogVerbosity(verbosity: number): void
+    export function setLogVerbosity(verbosity: number): void;
 
     export class Metadata {
         /**
@@ -298,155 +367,196 @@ declare module 'grpc' {
          */
         OK = 0,
 
-            /**
-             * The operation was cancelled (typically by the caller).
-             */
+        /**
+         * The operation was cancelled (typically by the caller).
+         */
         CANCELLED = 1,
 
-            /**
-             * Unknown error.  An example of where this error may be returned is
-             * if a Status value received from another address space belongs to
-             * an error-space that is not known in this address space.  Also
-             * errors raised by APIs that do not return enough error information
-             * may be converted to this error.
-             */
+        /**
+         * Unknown error.  An example of where this error may be returned is
+         * if a Status value received from another address space belongs to
+         * an error-space that is not known in this address space.  Also
+         * errors raised by APIs that do not return enough error information
+         * may be converted to this error.
+         */
         UNKNOWN = 2,
 
-            /**
-             * Client specified an invalid argument.  Note that this differs
-             * from FAILED_PRECONDITION.  INVALID_ARGUMENT indicates arguments
-             * that are problematic regardless of the state of the system
-             * (e.g., a malformed file name).
-             */
+        /**
+         * Client specified an invalid argument.  Note that this differs
+         * from FAILED_PRECONDITION.  INVALID_ARGUMENT indicates arguments
+         * that are problematic regardless of the state of the system
+         * (e.g., a malformed file name).
+         */
         INVALID_ARGUMENT = 3,
 
-            /**
-             * Deadline expired before operation could complete.  For operations
-             * that change the state of the system, this error may be returned
-             * even if the operation has completed successfully.  For example, a
-             * successful response from a server could have been delayed long
-             * enough for the deadline to expire.
-             */
+        /**
+         * Deadline expired before operation could complete.  For operations
+         * that change the state of the system, this error may be returned
+         * even if the operation has completed successfully.  For example, a
+         * successful response from a server could have been delayed long
+         * enough for the deadline to expire.
+         */
         DEADLINE_EXCEEDED = 4,
 
-            /**
-             * Some requested entity (e.g., file or directory) was not found.
-             */
+        /**
+         * Some requested entity (e.g., file or directory) was not found.
+         */
         NOT_FOUND = 5,
 
-            /**
-             * Some entity that we attempted to create (e.g., file or directory)
-             * already exists.
-             */
+        /**
+         * Some entity that we attempted to create (e.g., file or directory)
+         * already exists.
+         */
         ALREADY_EXISTS = 6,
 
-            /**
-             * The caller does not have permission to execute the specified
-             * operation.  PERMISSION_DENIED must not be used for rejections
-             * caused by exhausting some resource (use RESOURCE_EXHAUSTED
-             * instead for those errors).  PERMISSION_DENIED must not be
-             * used if the caller can not be identified (use UNAUTHENTICATED
-             * instead for those errors).
-             */
+        /**
+         * The caller does not have permission to execute the specified
+         * operation.  PERMISSION_DENIED must not be used for rejections
+         * caused by exhausting some resource (use RESOURCE_EXHAUSTED
+         * instead for those errors).  PERMISSION_DENIED must not be
+         * used if the caller can not be identified (use UNAUTHENTICATED
+         * instead for those errors).
+         */
         PERMISSION_DENIED = 7,
 
-            /**
-             * The request does not have valid authentication credentials for the
-             * operation.
-             */
+        /**
+         * The request does not have valid authentication credentials for the
+         * operation.
+         */
         UNAUTHENTICATED = 16,
 
-            /* Some resource has been exhausted, perhaps a per-user quota, or
-             perhaps the entire file system is out of space. */
+        /**
+         * Some resource has been exhausted, perhaps a per-user quota, or
+         * perhaps the entire file system is out of space.
+         */
         RESOURCE_EXHAUSTED = 8,
 
-            /* Operation was rejected because the system is not in a state
-             required for the operation's execution.  For example, directory
-             to be deleted may be non-empty, an rmdir operation is applied to
-             a non-directory, etc.
-
-             A litmus test that may help a service implementor in deciding
-             between FAILED_PRECONDITION, ABORTED, and UNAVAILABLE:
-             (a) Use UNAVAILABLE if the client can retry just the failing call.
-             (b) Use ABORTED if the client should retry at a higher-level
-             (e.g., restarting a read-modify-write sequence).
-             (c) Use FAILED_PRECONDITION if the client should not retry until
-             the system state has been explicitly fixed.  E.g., if an "rmdir"
-             fails because the directory is non-empty, FAILED_PRECONDITION
-             should be returned since the client should not retry unless
-             they have first fixed up the directory by deleting files from it.
-             (d) Use FAILED_PRECONDITION if the client performs conditional
-             REST Get/Update/Delete on a resource and the resource on the
-             server does not match the condition. E.g., conflicting
-             read-modify-write on the same resource. */
+        /**
+         * Operation was rejected because the system is not in a state
+         * required for the operation's execution.  For example, directory
+         * to be deleted may be non-empty, an rmdir operation is applied to
+         * a non-directory, etc.
+         *
+         * A litmus test that may help a service implementor in deciding
+         * between FAILED_PRECONDITION, ABORTED, and UNAVAILABLE:
+         * (a) Use UNAVAILABLE if the client can retry just the failing call.
+         * (b) Use ABORTED if the client should retry at a higher-level
+         * (e.g., restarting a read-modify-write sequence).
+         * (c) Use FAILED_PRECONDITION if the client should not retry until
+         * the system state has been explicitly fixed.  E.g., if an "rmdir"
+         * fails because the directory is non-empty, FAILED_PRECONDITION
+         * should be returned since the client should not retry unless
+         * they have first fixed up the directory by deleting files from it.
+         * (d) Use FAILED_PRECONDITION if the client performs conditional
+         * REST Get/Update/Delete on a resource and the resource on the
+         * server does not match the condition. E.g., conflicting
+         * read-modify-write on the same resource.
+         */
         FAILED_PRECONDITION = 9,
 
-            /* The operation was aborted, typically due to a concurrency issue
-             like sequencer check failures, transaction aborts, etc.
-
-             See litmus test above for deciding between FAILED_PRECONDITION,
-             ABORTED, and UNAVAILABLE. */
+        /**
+         * The operation was aborted, typically due to a concurrency issue
+         * like sequencer check failures, transaction aborts, etc.
+         *
+         * See litmus test above for deciding between FAILED_PRECONDITION,
+         * ABORTED, and UNAVAILABLE.
+         */
         ABORTED = 10,
 
-            /* Operation was attempted past the valid range.  E.g., seeking or
-             reading past end of file.
-
-             Unlike INVALID_ARGUMENT, this error indicates a problem that may
-             be fixed if the system state changes. For example, a 32-bit file
-             system will generate INVALID_ARGUMENT if asked to read at an
-             offset that is not in the range [0,2^32-1], but it will generate
-             OUT_OF_RANGE if asked to read from an offset past the current
-             file size.
-
-             There is a fair bit of overlap between FAILED_PRECONDITION and
-             OUT_OF_RANGE.  We recommend using OUT_OF_RANGE (the more specific
-             error) when it applies so that callers who are iterating through
-             a space can easily look for an OUT_OF_RANGE error to detect when
-             they are done. */
+        /**
+         * Operation was attempted past the valid range.  E.g., seeking or
+         * reading past end of file.
+         *
+         * Unlike INVALID_ARGUMENT, this error indicates a problem that may
+         * be fixed if the system state changes. For example, a 32-bit file
+         * system will generate INVALID_ARGUMENT if asked to read at an
+         * offset that is not in the range [0,2^32-1], but it will generate
+         * OUT_OF_RANGE if asked to read from an offset past the current
+         * file size.
+         *
+         * There is a fair bit of overlap between FAILED_PRECONDITION and
+         * OUT_OF_RANGE.  We recommend using OUT_OF_RANGE (the more specific
+         * error) when it applies so that callers who are iterating through
+         * a space can easily look for an OUT_OF_RANGE error to detect when
+         * they are done.
+         */
         OUT_OF_RANGE = 11,
 
-            /* Operation is not implemented or not supported/enabled in this service. */
+        /**
+         * Operation is not implemented or not supported/enabled in this service.
+         */
         UNIMPLEMENTED = 12,
 
-            /* Internal errors.  Means some invariants expected by underlying
-             system has been broken.  If you see one of these errors,
-             something is very broken. */
+        /**
+         * Internal errors.  Means some invariants expected by underlying
+         * system has been broken.  If you see one of these errors,
+         * something is very broken.
+         */
         INTERNAL = 13,
 
-            /* The service is currently unavailable.  This is a most likely a
-             transient condition and may be corrected by retrying with
-             a backoff.
-
-             See litmus test above for deciding between FAILED_PRECONDITION,
-             ABORTED, and UNAVAILABLE. */
+        /**
+         * The service is currently unavailable.  This is a most likely a
+         * transient condition and may be corrected by retrying with
+         * a backoff.
+         *
+         * See litmus test above for deciding between FAILED_PRECONDITION,
+         * ABORTED, and UNAVAILABLE.
+         */
         UNAVAILABLE = 14,
 
-            /* Unrecoverable data loss or corruption. */
+        /**
+         * Unrecoverable data loss or corruption.
+         */
         DATA_LOSS = 15,
 
-            /* Force users to include a default branch: */
+        /**
+         * Force users to include a default branch:
+         */
         _DO_NOT_USE = -1
     }
 
     /**
      * Propagate flag name to number mapping
      */
-    export const propagate: {};
+    export const propagate: {
+        DEADLINE: 1,
+        CENSUS_STATS_CONTEXT: 2,
+        CENSUS_TRACING_CONTEXT: 4,
+        CANCELLATION: 8,
+        DEFAULTS: 65535
+    };
 
     /**
      * Call error name to code number mapping
      */
-    export const callError: {};
+    export const callError: {
+        OK: 0,
+        ERROR: 1,
+        NOT_ON_SERVER: 2,
+        NOT_ON_CLIENT: 3,
+        ALREADY_INVOKED: 5,
+        NOT_INVOKED: 6,
+        ALREADY_FINISHED: 7,
+        TOO_MANY_OPERATIONS: 8,
+        INVALID_FLAGS: 9
+    };
 
     /**
      * Write flag name to code number mapping
      */
-    export const writeFlags: {};
+    export const writeFlags: {
+        BUFFER_HINT: 1,
+        NO_COMPRESS: 2
+    };
 
     /**
      * Log verbosity setting name to code number mapping
      */
-    export const logVerbosity: {};
+    export const logVerbosity: {
+        DEBUG: 0,
+        INFO: 1,
+        ERROR: 2
+    };
 
     /**
      * Creates a constructor for a client with the given methods.
@@ -455,6 +565,35 @@ declare module 'grpc' {
      * @return New client constructor
      */
     export function makeGenericClientConstructor(methods: IMethodsMap, serviceName?: string): Client;
+
+    export interface IClientCall {
+        /**
+         * Cancel the ongoing call
+         */
+        cancel(): void;
+
+        /**
+         * Get the endpoint this call/stream is connected to.
+         * @return {string} The URI of the endpoint
+         */
+        getPeer(): string;
+    }
+    export class ClientUnaryCall extends EventEmitter implements IClientCall {
+        cancel(): void;
+        getPeer(): string;
+    }
+    export class ClientWritableStream extends Writable implements IClientCall {
+        cancel(): void;
+        getPeer(): string;
+    }
+    export class ClientReadableStream extends Readable implements IClientCall {
+        cancel(): void;
+        getPeer(): string;
+    }
+    export class ClientDuplexStream extends Duplex implements IClientCall {
+        cancel(): void;
+        getPeer(): string;
+    }
 
     /**
      * Create a client with the given methods
@@ -473,36 +612,58 @@ declare module 'grpc' {
 
     }
 
+    export interface IMethod {
+        /**
+         * The path on the server for accessing the method. For example, for protocol buffers, we use "/service_name/method_name"
+         */
+        path: string;
+
+        /**
+         * Indicating whether the client sends a stream
+         */
+        requestStream: boolean;
+
+        /**
+         * Indicating whether the server sends a stream
+         */
+        responseStream: boolean;
+
+        /**
+         * Request type
+         */
+        requestType: any;
+
+        /**
+         * Response type
+         */
+        responseType: any;
+
+        /**
+         * Function to serialize request objects
+         */
+        requestSerialize: (arg: any) => Buffer;
+
+        /**
+         * Function to deserialize request objects
+         */
+        requestDeserialize: (buffer: Buffer) => any;
+
+        /**
+         * Function to serialize response objects
+         */
+        responseSerialize: (arg: any) => Buffer;
+
+        /**
+         * Function to deserialize response objects
+         */
+        responseDeserialize: (buffer: Buffer) => any;
+    }
+
     /**
      * The methods object map.
      */
     export interface IMethodsMap {
-        [index: string]: {
-            /**
-             * The path on the server for accessing the method. For example, for protocol buffers, we use "/service_name/method_name"
-             */
-            path: string;
-
-            /**
-             * Indicating whether the client sends a stream
-             */
-            requestStream: boolean;
-
-            /**
-             * Indicating whether the server sends a stream
-             */
-            responseStream: boolean;
-
-            /**
-             * Function to serialize request objects
-             */
-            requestSerialize: () => any;
-
-            /**
-             * Function to deserialize response objects
-             */
-            responseDeserialize: () => any;
-        }
+        [index: string]: IMethod;
     }
 
     /**
@@ -522,7 +683,7 @@ declare module 'grpc' {
      * @param deadline When to stop waiting for a connection. Pass Infinity to wait forever.
      * @param callback The callback to call when done attempting to connect.
      */
-    export function waitForClientReady(client: Client, deadline: Date | number, callback: (error: Error | null) => void): void;
+    export function waitForClientReady(client: Client, deadline: Date | number, callback: ICallbackNode): void;
 
     export function closeClient(clientObj: Client): void;
 }
