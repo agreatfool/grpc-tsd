@@ -1,6 +1,6 @@
 {
   "name": "grpc-tsd",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "TypeScript d.ts definition of gRPC. Self made for self using, no official support.",
   "main": "src/grpc.d.ts",
   "scripts": {
