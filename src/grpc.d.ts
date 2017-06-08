@@ -1,5 +1,7 @@
+import { ReflectionObject, Service } from 'protobufjs';
+import { Duplex, Readable, Writable } from 'stream';
+
 declare module 'grpc' {
-    import { ReflectionObject, Service } from 'protobufjs'
 
     /**
      * Default options for loading proto files into gRPC
