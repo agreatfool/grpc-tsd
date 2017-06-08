@@ -4,8 +4,10 @@ declare module 'grpc' {
     import {ReflectionObject, Service} from "protobufjs";
     import EventEmitter = NodeJS.EventEmitter;
 
-    export type ICallback = () => void;
-    export type ICallbackNode = (error: Error | null, value?: any) => void;
+    export type Callback = () => void;
+    export type CallbackNode = (error: Error | null, value?: any) => void;
+    export type RpcImplCallback = (error: Error | null, value: any, trailer?: Metadata, flags?: number) => void;
+    export type CallbackMetadata = (error: Error | null, metadata?: Metadata) => void;
 
     /**
      * Default options for loading proto files into gRPC
@@ -81,11 +83,11 @@ declare module 'grpc' {
      *   ProtoBuf.js is provided in the value argument. If the option is 'detect',
      *   gRPC will guess what the version is based on the structure of the value.
      *   Defaults to 'detect'.
-     * @param {Object} replectionObject The ProtoBuf.js reflection object to load
+     * @param {Object} reflectionObject The ProtoBuf.js reflection object to load
      * @param {Object=} options Options to apply to the loaded file
      * @return {Object<string, *>} The resulting gRPC object
      */
-    export function loadObject(replectionObject: ReflectionObject, options?: ILoadProtobufOptions): IProtobufDefinition;
+    export function loadObject(reflectionObject: ReflectionObject, options?: ILoadProtobufOptions): IProtobufDefinition;
 
     interface ICallStatus {
         code: number;
@@ -96,7 +98,7 @@ declare module 'grpc' {
     class Call extends Stream {
         metadataSent: boolean;
 
-        startBatch(batch: { number: ICallStatus | boolean }, callback: ICallbackNode): void;
+        startBatch(batch: { number: ICallStatus | boolean }, callback: CallbackNode): void;
 
         /**
          * Get the endpoint this call/stream is connected to.
@@ -143,14 +145,12 @@ declare module 'grpc' {
         waitForCancel();
     }
 
-    export type IRpcImplCallback = (error: Error | null, value: any, trailer?: Metadata, flags?: number) => void;
+    export type ServiceImplUnaryCall = (call: ServerUnaryCall, callback: RpcImplCallback) => void;
+    export type ServiceImplWritableStream = (call: ServerWritableStream) => void;
+    export type ServiceImplReadableStream = (call: ServerReadableStream, callback: RpcImplCallback) => void;
+    export type ServiceImplDuplexStream = (call: ServerDuplexStream) => void;
 
-    export type IRpcImplUnaryCall = (call: ServerUnaryCall, callback: IRpcImplCallback) => void;
-    export type IRpcImplWritableStream = (call: ServerWritableStream) => void;
-    export type IRpcImplReadableStream = (call: ServerReadableStream, callback: IRpcImplCallback) => void;
-    export type IRpcImplDuplexStream = (call: ServerDuplexStream) => void;
-
-    export type IRpcImplementation = IRpcImplUnaryCall | IRpcImplWritableStream | IRpcImplReadableStream | IRpcImplDuplexStream;
+    export type ServiceImplementation = ServiceImplUnaryCall | ServiceImplWritableStream | ServiceImplReadableStream | ServiceImplDuplexStream;
 
     /**
      * Serer object that stores request handlers and delegates incoming requests to those handlers
@@ -174,7 +174,7 @@ declare module 'grpc' {
          * is idempotent with itself and forceShutdown.
          * @param callback The shutdown complete callback
          */
-        tryShutdown(callback: ICallback): void;
+        tryShutdown(callback: Callback): void;
 
         /**
          * Forcibly shuts down the server. The server will stop receiving new calls
@@ -190,7 +190,7 @@ declare module 'grpc' {
          * @param service The service descriptor, as `getProtobufServiceAttrs` returns
          * @param implementation Map of method names to method implementation for the provided service.
          */
-        addService(service: IMethodsMap, implementation: { [index: string]: IRpcImplementation }): void;
+        addService(service: IMethodsMap, implementation: { [index: string]: ServiceImplementation }): void;
 
         /**
          * Add a proto service to the server, with a corresponding implementation
@@ -217,8 +217,6 @@ declare module 'grpc' {
         message: string;
     }
 
-    export type ICallbackMetadata = (error: Error | null, metadata?: Metadata) => void;
-
     /**
      * Credentials factories
      */
@@ -241,7 +239,7 @@ declare module 'grpc' {
          * @param metadataGenerator The function that generates metadata
          * @return The credentials object
          */
-        createFromMetadataGenerator(metadataGenerator: (target: { service_url: string }, callback: ICallbackMetadata) => void): CallCredentials;
+        createFromMetadataGenerator(metadataGenerator: (target: { service_url: string }, callback: CallbackMetadata) => void): CallCredentials;
 
         /**
          * Create a gRPC credential from a Google credential object.
@@ -683,7 +681,7 @@ declare module 'grpc' {
      * @param deadline When to stop waiting for a connection. Pass Infinity to wait forever.
      * @param callback The callback to call when done attempting to connect.
      */
-    export function waitForClientReady(client: Client, deadline: Date | number, callback: ICallbackNode): void;
+    export function waitForClientReady(client: Client, deadline: Date | number, callback: CallbackNode): void;
 
     export function closeClient(clientObj: Client): void;
 }
