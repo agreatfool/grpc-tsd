@@ -6,6 +6,6 @@ cd ${BASEDIR}/../
 git add .
 git commit -m "Update."
 
-npm version patch
-npm publish
+npm version patch --verbose
+npm publish --verbose
 git push origin master --verbose
