@@ -9,3 +9,8 @@ Codes mostly comes from [#11020](https://github.com/grpc/grpc/pull/11020), and a
 
 ## Aim
 Maintain a grpc.d.ts file for gRPC TypeScript project.
+
+## Resources
+* [gRPC node source doc](http://www.grpc.io/grpc/node/index.html)
+* [#11020](https://github.com/grpc/grpc/pull/11020)
+* [mixer/etcd3](https://github.com/mixer/etcd3/blob/master/src/types/grpc.d.ts)
