@@ -111,6 +111,11 @@ declare module 'grpc' {
         call: Call;
 
         /**
+         * Metadata in the request from client.
+         */
+        metadata: Metadata;
+
+        /**
          * Send the initial metadata for a writable stream.
          * @param {Metadata} responseMetadata Metadata to send
          */
@@ -125,22 +130,26 @@ declare module 'grpc' {
     export class ServerUnaryCall extends EventEmitter implements IServerCall {
         request: any;
         call: Call;
+        metadata: Metadata;
         sendMetadata(responseMetadata: Metadata);
         waitForCancel();
     }
     export class ServerWritableStream extends Writable implements IServerCall {
         request: any;
         call: Call;
+        metadata: Metadata;
         sendMetadata(responseMetadata: Metadata);
         waitForCancel();
     }
     export class ServerReadableStream extends Readable implements IServerCall {
         call: Call;
+        metadata: Metadata;
         sendMetadata(responseMetadata: Metadata);
         waitForCancel();
     }
     export class ServerDuplexStream extends Duplex implements IServerCall {
         call: Call;
+        metadata: Metadata;
         sendMetadata(responseMetadata: Metadata);
         waitForCancel();
     }
