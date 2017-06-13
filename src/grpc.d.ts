@@ -90,7 +90,7 @@ declare module 'grpc' {
     export function loadObject(reflectionObject: ReflectionObject, options?: ILoadProtobufOptions): IProtobufDefinition;
 
     interface ICallStatus {
-        code: number;
+        code: number; // corresponding to "enum status"
         details: string;
         metadata?: Metadata;
     }
@@ -224,8 +224,6 @@ declare module 'grpc' {
     export interface IError {
         code: string;
         message: string;
-        status?: number; // corresponding to "enum status"
-        metadata?: Metadata;
     }
 
     /**
