@@ -397,7 +397,7 @@ declare module 'grpc' {
          * Creates a Metadata object from a metadata map in the internal format.
          * Intended for internal use only. API stability is not guaranteed.
          * @private
-         * @param {Object.<String, Array.<String|Buffer>>} metadata
+         * @param {Metadata} metadata
          * @return {Metadata} The new Metadata object
          */
         _fromCoreRepresentation(metadata: Metadata): Metadata;
