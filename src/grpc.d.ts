@@ -98,7 +98,7 @@ declare module 'grpc' {
     class Call extends Stream {
         metadataSent: boolean;
 
-        startBatch(batch: { number: ICallStatus | boolean }, callback: CallbackNode): void;
+        startBatch(batch: { [index: number]: ICallStatus | boolean }, callback: CallbackNode): void;
 
         /**
          * Get the endpoint this call/stream is connected to.
