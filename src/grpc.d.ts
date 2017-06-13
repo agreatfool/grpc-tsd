@@ -389,9 +389,9 @@ declare module 'grpc' {
         /**
          * Gets the metadata in the format used by interal code. Intended for internal
          * use only. API stability is not guaranteed.
-         * @return {Object.<String, Array.<String|Buffer>>} The metadata
+         * @return {Metadata} The metadata
          */
-        _getCoreRepresentation(): { [index: string]: Array<string | Buffer> }
+        _getCoreRepresentation(): Metadata
 
         /**
          * Creates a Metadata object from a metadata map in the internal format.
