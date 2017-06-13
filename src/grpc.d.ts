@@ -224,6 +224,8 @@ declare module 'grpc' {
     export interface IError {
         code: string;
         message: string;
+        status?: number; // corresponding to "enum status"
+        metadata?: Metadata;
     }
 
     /**
