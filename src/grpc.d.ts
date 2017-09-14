@@ -124,13 +124,13 @@ declare module 'grpc' {
          * Send the initial metadata for a writable stream.
          * @param {Metadata} responseMetadata Metadata to send
          */
-        sendMetadata(responseMetadata: Metadata);
+        sendMetadata(responseMetadata: Metadata): any;
 
         /**
          * Wait for the client to close, then emit a cancelled event if the client
          * cancelled.
          */
-        waitForCancel();
+        waitForCancel(): any;
     }
     export class ServerUnaryCall extends EventEmitter implements IServerCall {
         request: any;
@@ -138,9 +138,9 @@ declare module 'grpc' {
         metadataSent: boolean;
         metadata: Metadata;
 
-        sendMetadata(responseMetadata: Metadata);
+        sendMetadata(responseMetadata: Metadata): any;
 
-        waitForCancel();
+        waitForCancel(): any;
     }
     export class ServerWritableStream extends Writable implements IServerCall {
         request: any;
@@ -148,27 +148,27 @@ declare module 'grpc' {
         metadataSent: boolean;
         metadata: Metadata;
 
-        sendMetadata(responseMetadata: Metadata);
+        sendMetadata(responseMetadata: Metadata): any;
 
-        waitForCancel();
+        waitForCancel(): any;
     }
     export class ServerReadableStream extends Readable implements IServerCall {
         call: Call;
         metadataSent: boolean;
         metadata: Metadata;
 
-        sendMetadata(responseMetadata: Metadata);
+        sendMetadata(responseMetadata: Metadata): any;
 
-        waitForCancel();
+        waitForCancel(): any;
     }
     export class ServerDuplexStream extends Duplex implements IServerCall {
         call: Call;
         metadataSent: boolean;
         metadata: Metadata;
 
-        sendMetadata(responseMetadata: Metadata);
+        sendMetadata(responseMetadata: Metadata): any;
 
-        waitForCancel();
+        waitForCancel(): any;
     }
 
     export type ServiceImplUnaryCall = (call: ServerUnaryCall, callback: RpcImplCallback) => void;
