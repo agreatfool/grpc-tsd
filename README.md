@@ -1,6 +1,9 @@
 grpc-tsd
 ========
 
+## Deprecated!!
+Since gRPC has published it's official definition, see [index.d.ts](https://github.com/grpc/grpc-node/blob/v1.7.x/packages/grpc-native-core/index.d.ts). Current project is deprecated.
+
 ## Attention
 Current gRPC(v1.3.7) has no official TypeScript definition. But shall have one soon, see: [#11020](https://github.com/grpc/grpc/pull/11020). This repo would be `Deprecated` as soon as official d.ts online.
 
